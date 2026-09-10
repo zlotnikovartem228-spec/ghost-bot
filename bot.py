@@ -6,7 +6,7 @@ from flask import Flask, request
 BOT_TOKEN = "8662374904:AAEMd1FOnIyAmmqW_Gh0k5_Sgam-QUBk_bs"
 ADMIN_ID = 8699816052
 # URL, который Render выдаст после деплоя (заменишь потом)
-WEBHOOK_URL = WEBHOOK_URL = "https://ghost-bot-97za.onrender.com"
+WEBHOOK_URL = "https://ghost-bot-97za.onrender.com"
 # =====================
 
 bot = telebot.TeleBot(BOT_TOKEN)
