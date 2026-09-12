@@ -2,7 +2,6 @@ import os
 import telebot
 import psycopg2
 from flask import Flask, request
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 BOT_TOKEN = "8662374904:AAEMd1FOnIyAmmqW_Gh0k5_Sgam-QUBk_bs"
 ADMIN_ID = 8699816052
@@ -78,11 +77,12 @@ def geo(message):
 def photo(message):
     if message.chat.id != ADMIN_ID: return
     add_command("gallery")
-    keyboard = [[
-        InlineKeyboardButton("⬅️ Назад", callback_data="prev"),
-        InlineKeyboardButton("Вперёд ➡️", callback_data="next")
-    ]]
-    bot.send_message(message.chat.id, "📸 Загружаю...", reply_markup=InlineKeyboardMarkup(keyboard))
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.row(
+        telebot.types.InlineKeyboardButton("⬅️ Назад", callback_data="prev"),
+        telebot.types.InlineKeyboardButton("Вперёд ➡️", callback_data="next")
+    )
+    bot.send_message(message.chat.id, "📸 Загружаю...", reply_markup=markup)
 
 @bot.message_handler(commands=['selfie'])
 def selfie(message):
@@ -100,8 +100,10 @@ def photo_back(message):
 def callback(call):
     if call.data == "next":
         add_command("gallery_next")
+        bot.answer_callback_query(call.id, "➡️ Следующее")
     elif call.data == "prev":
         add_command("gallery_prev")
+        bot.answer_callback_query(call.id, "⬅️ Предыдущее")
 
 # ===== API ДЛЯ APK =====
 
